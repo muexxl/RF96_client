@@ -15,6 +15,11 @@
 
 #define FREQUENCY 868.0
 #define SERIAL_SPEED 115200
+#define SPREADINGFACTOR 6 // 6..12
+
+#define REG_Detection_Optimize 0x31
+#define REG_Detect_Threshold 0x37
+
 
 // Singleton instance of the radio driver
 RH_RF95 rf95;
@@ -33,7 +38,11 @@ bool reportingDue{false};
 void print_report();
 
 void handle_message(void *msg, int len);
-
+void set_SF6();
+void set_implicit_Header();
+void set_detection_optimize();
+void set_detection_threshold();
+void print_register(uint8_t reg);
 void setup()
 {
   // Rocket Scream Mini Ultra Pro with the RFM95W only:
@@ -65,7 +74,56 @@ void setup()
   //  rf95.setTxPower(14, true);
 
   setupTimer1(2000);
+  rf95.setModemConfig(rf95.Bw500Cr45Sf128);
   rf95.setFrequency(FREQUENCY);
+
+   rf95.setModemConfig(rf95.Bw500Cr45Sf128);
+  //rf95.setSpreadingFactor(SPREADINGFACTOR);
+  // implicit header mode
+  //rf95.spiWrite(0x1d, ((rf95.spiRead(0x1d) & 0xfe )| 0x01));
+
+  rf95.setFrequency(FREQUENCY);
+  
+  Serial.print(F("BW500 configuration\n"));
+  print_register(RH_RF95_REG_1D_MODEM_CONFIG1);
+  print_register(RH_RF95_REG_1E_MODEM_CONFIG2);
+  print_register(RH_RF95_REG_26_MODEM_CONFIG3);
+  print_register(RH_RF95_REG_31_DETECT_OPTIMIZE);
+  print_register(RH_RF95_REG_37_DETECTION_THRESHOLD);
+
+  Serial.print(F("Changing to SF6\n"));
+  set_SF6();
+  print_register(RH_RF95_REG_1D_MODEM_CONFIG1);
+  print_register(RH_RF95_REG_1E_MODEM_CONFIG2);
+  print_register(RH_RF95_REG_26_MODEM_CONFIG3);
+  print_register(RH_RF95_REG_31_DETECT_OPTIMIZE);
+  print_register(RH_RF95_REG_37_DETECTION_THRESHOLD);
+
+  Serial.print(F("Setting implicit Header\n"));
+  set_implicit_Header();
+  print_register(RH_RF95_REG_1D_MODEM_CONFIG1);
+  print_register(RH_RF95_REG_1E_MODEM_CONFIG2);
+  print_register(RH_RF95_REG_26_MODEM_CONFIG3);
+  print_register(RH_RF95_REG_31_DETECT_OPTIMIZE);
+  print_register(RH_RF95_REG_37_DETECTION_THRESHOLD);
+
+  Serial.print(F("Setting detection optimize\n"));
+  set_detection_optimize();
+  print_register(RH_RF95_REG_1D_MODEM_CONFIG1);
+  print_register(RH_RF95_REG_1E_MODEM_CONFIG2);
+  print_register(RH_RF95_REG_26_MODEM_CONFIG3);
+  print_register(RH_RF95_REG_31_DETECT_OPTIMIZE);
+  print_register(RH_RF95_REG_37_DETECTION_THRESHOLD);
+
+  Serial.print(F("Setting detection Threshold\n"));
+  set_detection_threshold();
+  print_register(RH_RF95_REG_1D_MODEM_CONFIG1);
+  print_register(RH_RF95_REG_1E_MODEM_CONFIG2);
+  print_register(RH_RF95_REG_26_MODEM_CONFIG3);
+  print_register(RH_RF95_REG_31_DETECT_OPTIMIZE);
+  print_register(RH_RF95_REG_37_DETECTION_THRESHOLD);
+
+
 }
 
 void loop()
@@ -73,7 +131,7 @@ void loop()
   uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
   uint8_t len = sizeof(buf);
 
-  if (rf95.waitAvailableTimeout(1000))
+  if (rf95.waitAvailableTimeout(3000))
   {
     // Should be a reply message for us now
     if (rf95.recv(buf, &len))
@@ -147,4 +205,30 @@ ISR(TIMER1_COMPA_vect)
 {
   //Serial.println("This is TIMER1 ISR A\n");
   reportingDue = true;
+}
+
+
+
+void set_SF6(){
+  rf95.setSpreadingFactor(6);
+}
+
+void set_implicit_Header(){
+  rf95.spiWrite(RH_RF95_REG_1D_MODEM_CONFIG1, ((rf95.spiRead(RH_RF95_REG_1D_MODEM_CONFIG1) & 0xfe )| 0x01));
+}
+
+void set_detection_optimize(){
+  rf95.spiWrite(REG_Detection_Optimize, ((rf95.spiRead(REG_Detection_Optimize) & 0xf8 )| 0x05)); // 0x05 = 0b101
+}
+
+void set_detection_threshold(){
+  rf95.spiWrite(REG_Detect_Threshold, 0x0C); // 0x0C for SF6 , 0x0A for SF7..12
+}
+
+void print_register(uint8_t reg){
+  Serial.print("Register 0x");
+  Serial.print(reg, HEX);
+  Serial.print("\t 0x");
+  Serial.print(rf95.spiRead(reg), HEX);
+  Serial.print("\n");
 }
